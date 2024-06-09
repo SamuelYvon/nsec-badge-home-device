@@ -14,7 +14,6 @@
 #include "disk.h"
 #include "save.h"
 #include "wifi.h"
-#include "badge/mesh/main.h"
 
 #define TAG "main"
 
@@ -57,17 +56,16 @@ extern "C" void app_main(void) {
     initialize_storage();
 
     /* will only show once log_level is saved and board is restarted */
-    ESP_LOGI("flag", "🤔 " LOG_COLOR("38;5;232;48;5;232") "FLAG-{378792f89d19dfe064b5fa36b5c54971}" LOG_RESET_COLOR);
+    ESP_LOGI(TAG, "Sam's board");
 
-	NeoPixel::getInstance().init();
+    NeoPixel::getInstance().init();
 
-    Buzzer::getInstance().init();
-    Buzzer::getInstance().play(Buzzer::Sounds::Mode1);
+    // Buzzer::getInstance().init();
+    // Buzzer::getInstance().play(Buzzer::Sounds::Mode1);
+    // Buzzer::getInstance().play(Buzzer::Sounds::Mode2);
+    // Buzzer::getInstance().play(Buzzer::Sounds::Mode3);
 
     Disk::getInstance().init();
-
-    BadgeMesh::getInstance().init();
-
     Wifi::getInstance().init();
 
     Display::getInstance().init();

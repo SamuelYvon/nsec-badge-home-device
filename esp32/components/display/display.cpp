@@ -24,7 +24,6 @@
 #include "buzzer.h"
 #include "save.h"
 #include "disk.h"
-#include "badge/mesh/main.h"
 #include "screens/splash.h"
 #include "screens/debug.h"
 #include "screens/assistant.h"
@@ -182,8 +181,6 @@ void Display::taskHandler()
             }
 
             Disk::getInstance().taskHandler();
-            BadgeMesh::getInstance().taskHandler();
-
             lv_task_handler();
             xSemaphoreGive(xGuiSemaphore);
         }

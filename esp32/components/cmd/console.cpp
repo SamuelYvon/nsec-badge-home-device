@@ -25,8 +25,6 @@
 #include "console.h"
 #include "buzzer.h"
 #include "save.h"
-#include "badge/mesh/cmd/admin.h"
-#include "badge/mesh/cmd/provision.h"
 
 static const char* TAG = "console";
 #define PROMPT_STR "nsec"
@@ -104,18 +102,12 @@ void console_task(void *args)
 
     /* register commands */
     esp_console_register_help_command();
-    register_provision_commands();
     register_debug_commands();
 
     if(Save::save_data.debug_enabled) {
         register_system();
         register_neopixel();
         register_flag_commands();
-
-#if CONFIG_BADGE_MESH_ADMIN_COMMANDS
-        register_nvs();
-        register_mesh_admin_commands();
-#endif
     }
 
     /* prompt to be printed before each line.

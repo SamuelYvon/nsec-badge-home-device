@@ -61,7 +61,6 @@ static const char *splash_strings[] = {
     SPLASH_STRINGS_LONG("Loading assets..."),
     SPLASH_STRINGS_LONG("Loading strings..."),
     SPLASH_STRINGS_LONG("Configuring wifi..."),
-    SPLASH_STRINGS_LONG("Configuring mesh network..."),
     SPLASH_STRINGS_LONG("Loading flags..."),
     SPLASH_STRINGS_SHORT("FLAG-{so_fast_84d45cceb0360957}"),
     SPLASH_STRINGS_LONG("Configuring dependencies..."),

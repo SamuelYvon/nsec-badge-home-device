@@ -21,7 +21,6 @@
 #include "lvgl/lvgl.h"
 #include "lvgl_helpers.h"
 
-#include "badge/mesh/main.h"
 #include "screens/assistant.h"
 #include "lv_utils.h"
 
@@ -101,11 +100,11 @@ void screen_assistant_loop()
     struct tm tm;
     time_t t;
 
-    if(BadgeMesh::getInstance().networkTimeIsValid()) {
-        BadgeMesh::getInstance().networkTimeGet(&t);
-        gmtime_r(&t, &tm);
-        lv_label_set_text_fmt(time_label, "%02d:%02d", tm.tm_hour, tm.tm_min);
-    }
+    // TODO: get time from network
+    // gmtime_r(&t, &tm);
+    tm.tm_hour = 0;
+    tm.tm_min = 0;
+    lv_label_set_text_fmt(time_label, "%02d:%02d", tm.tm_hour, tm.tm_min);
 
     TickType_t now = xTaskGetTickCount();
     TickType_t elapsed_ticks = now - last_quote_at;
@@ -114,7 +113,6 @@ void screen_assistant_loop()
     if(last_quote_at == 0 || elapsed_time_ms > (QUOTE_INTERVAL * 1000)) {
         const char *quote = quotes[current_quote_index];
         if(strstr(quote, "bathroom break:")) {
-            BadgeMesh::getInstance().networkTimeGet(&t);
             gmtime_r(&t, &tm);
             lv_label_set_text_fmt(quote_label, quote, (tm.tm_hour + 2) % 24, tm.tm_min);
         } else {

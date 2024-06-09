@@ -38,6 +38,8 @@ static void register_version(void);
 static void register_restart(void);
 static void register_deep_sleep(void);
 static void register_light_sleep(void);
+static void register_debug_commands(void);
+
 #if WITH_TASKS_INFO
 static void register_tasks(void);
 #endif
@@ -53,6 +55,7 @@ void register_system_common(void)
     register_tasks();
 #endif
     register_log_level();
+    register_debug_commands();
 }
 
 void register_system_sleep(void)
@@ -473,4 +476,25 @@ static void register_log_level(void)
         .argtable = &log_level_args
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
+
+
+static int wifi_hit(int argc, char** argv) {
+  printf("Hello :)\n");
+
+  return 0;
+}
+
+static void register_debug_commands(void) {
+
+  const esp_console_cmd_t cmd = {
+    .command = "wifi",
+    .help = "Hit the given address with an HTTP get",
+    .hint = NULL,
+    .func = &wifi_hit,
+    .argtable = NULL
+  };
+
+  ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+
 }
