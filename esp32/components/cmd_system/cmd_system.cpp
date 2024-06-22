@@ -24,6 +24,8 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/param.h>
 #include <string.h>
 #include <unistd.h>
 #include "esp_http_client.h"
@@ -511,13 +513,77 @@ static void wifi_disable(void)
   else printf("Wifi disabled.\r\n");
 }
 
+#define MAX_HTTP_RECV_BUFFER 512
+#define MAX_HTTP_OUTPUT_BUFFER 2048
+
+esp_err_t _http_event_handler(esp_http_client_event_t *evt)
+{
+    static size_t output_len = 0;
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
+            break;
+        case HTTP_EVENT_ON_CONNECTED:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
+            break;
+        case HTTP_EVENT_HEADER_SENT:
+            ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+            break;
+        case HTTP_EVENT_ON_DATA:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            // SAM: There's a bug here, we don't know the length of the user_data buffer,
+            // can't just clean it wtf
+            //
+            // Clean the buffer in case of a new request
+            // if (output_len == 0 && evt->user_data) {
+            //     // we are just starting to copy the output data into the use
+            //     memset(evt->user_data, 0, MAX_HTTP_OUTPUT_BUFFER);
+            // }
+            /*
+             *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
+             *  However, event handler can also be used in case chunked encoding is used.
+             */
+            if (!esp_http_client_is_chunked_response(evt->client)) {
+                // If user_data buffer is configured, copy the response into the buffer
+                int copy_len = 0;
+                assert(evt->user_data);
+
+                // The last byte in evt->user_data is kept for the NULL character in case of out-of-bound access.
+                copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
+                if (copy_len) {
+                    memcpy(evt->user_data + output_len, evt->data, copy_len);
+                }
+                output_len += copy_len;
+            }
+
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
+            output_len = 0;
+            break;
+        case HTTP_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
+            break;
+        case HTTP_EVENT_REDIRECT:
+            ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
+            break;
+    }
+    return ESP_OK;
+}
+
 static void wifi_hit(const char* endpoint) {
   int status_code = 0;
-  char response_buffer[1024 + 1] = {0};
+  size_t response_size = 0;
+  char response_buffer[MAX_HTTP_RECV_BUFFER + 1] = {0};
   esp_http_client_config_t cfg = {
-    .url = "http://192.168.5.12:8000",
+    .url = endpoint,
     .method = HTTP_METHOD_GET,
-    .user_data = response_buffer,
+    .event_handler = _http_event_handler,
+    .buffer_size = MAX_HTTP_RECV_BUFFER,
+    .user_data = response_buffer
   };
 
   esp_http_client_handle_t client_handle = esp_http_client_init(&cfg);
@@ -535,11 +601,17 @@ static void wifi_hit(const char* endpoint) {
     goto fail;
   }
 
+  response_size = esp_http_client_get_content_length(client_handle);
+
+  printf("Response size is %zu, strlen is %zu\r\n",
+      response_size,
+      strlen(response_buffer));
+
   printf("Response received:\r\n");
-  printf("%s", (char*) response_buffer);
+  printf("%s\r\n", (char*) response_buffer);
 
   fail:
-    esp_http_client_cleanup(client_handle);
+  esp_http_client_cleanup(client_handle);
 }
 
 static int wifi_cmd(int argc, char **argv)
