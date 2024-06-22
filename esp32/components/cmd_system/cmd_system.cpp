@@ -7,24 +7,26 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <inttypes.h>
-#include <unistd.h>
-#include "esp_log.h"
-#include "esp_console.h"
-#include "esp_chip_info.h"
-#include "esp_sleep.h"
-#include "esp_flash.h"
+#include "cmd_system.h"
+#include "argtable3/argtable3.h"
 #include "driver/rtc_io.h"
 #include "driver/uart.h"
-#include "argtable3/argtable3.h"
+#include "esp_chip_info.h"
+#include "esp_console.h"
+#include "esp_flash.h"
+#include "esp_log.h"
+#include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "cmd_system.h"
-#include "sdkconfig.h"
 #include "save.h"
+#include "sdkconfig.h"
+#include "wifi.h"
+#include <ctype.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include "esp_http_client.h"
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -67,7 +69,7 @@ void register_system_sleep(void)
 void register_system(void)
 {
     register_system_common();
-    //register_system_sleep();
+    // register_system_sleep();
 }
 
 /* 'version' command */
@@ -78,31 +80,31 @@ static int get_version(int argc, char **argv)
     uint32_t flash_size;
     esp_chip_info(&info);
 
-    switch(info.model) {
-        case CHIP_ESP32:
-            model = "ESP32";
-            break;
-        case CHIP_ESP32S2:
-            model = "ESP32-S2";
-            break;
-        case CHIP_ESP32S3:
-            model = "ESP32-S3";
-            break;
-        case CHIP_ESP32C3:
-            model = "ESP32-C3";
-            break;
-        case CHIP_ESP32H2:
-            model = "ESP32-H2";
-            break;
-        case CHIP_ESP32C2:
-            model = "ESP32-C2";
-            break;
-        default:
-            model = "Unknown";
-            break;
+    switch (info.model) {
+    case CHIP_ESP32:
+        model = "ESP32";
+        break;
+    case CHIP_ESP32S2:
+        model = "ESP32-S2";
+        break;
+    case CHIP_ESP32S3:
+        model = "ESP32-S3";
+        break;
+    case CHIP_ESP32C3:
+        model = "ESP32-C3";
+        break;
+    case CHIP_ESP32H2:
+        model = "ESP32-H2";
+        break;
+    case CHIP_ESP32C2:
+        model = "ESP32-C2";
+        break;
+    default:
+        model = "Unknown";
+        break;
     }
 
-    if(esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
+    if (esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
         printf("Get flash size failed");
         return 1;
     }
@@ -110,11 +112,12 @@ static int get_version(int argc, char **argv)
     printf("Chip info:\r\n");
     printf("\tmodel:%s\r\n", model);
     printf("\tcores:%d\r\n", info.cores);
-    printf("\tfeature:%s%s%s%s%"PRIu32"%s\r\n",
+    printf("\tfeature:%s%s%s%s%" PRIu32 "%s\r\n",
            info.features & CHIP_FEATURE_WIFI_BGN ? "/802.11bgn" : "",
            info.features & CHIP_FEATURE_BLE ? "/BLE" : "",
            info.features & CHIP_FEATURE_BT ? "/BT" : "",
-           info.features & CHIP_FEATURE_EMB_FLASH ? "/Embedded-Flash:" : "/External-Flash:",
+           info.features & CHIP_FEATURE_EMB_FLASH ? "/Embedded-Flash:"
+                                                  : "/External-Flash:",
            flash_size / (1024 * 1024), " MB");
     printf("\trevision number:%d\r\n", info.revision);
     return 0;
@@ -128,7 +131,7 @@ static void register_version(void)
         .hint = NULL,
         .func = &get_version,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 /** 'restart' command restarts the program */
@@ -147,14 +150,14 @@ static void register_restart(void)
         .hint = NULL,
         .func = &restart,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 /** 'free' command prints available heap memory */
 
 static int free_mem(int argc, char **argv)
 {
-    printf("%"PRIu32"\n", esp_get_free_heap_size());
+    printf("%" PRIu32 "\n", esp_get_free_heap_size());
     return 0;
 }
 
@@ -166,14 +169,14 @@ static void register_free(void)
         .hint = NULL,
         .func = &free_mem,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 /* 'heap' command prints minumum heap size */
 static int heap_size(int argc, char **argv)
 {
     uint32_t heap_size = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
-    printf("min heap size: %"PRIu32"\n", heap_size);
+    printf("min heap size: %" PRIu32 "\n", heap_size);
     return 0;
 }
 
@@ -181,12 +184,12 @@ static void register_heap(void)
 {
     const esp_console_cmd_t heap_cmd = {
         .command = "heap",
-        .help = "Get minimum size of free heap memory that was available during program execution",
+        .help = "Get minimum size of free heap memory that was available "
+                "during program execution",
         .hint = NULL,
         .func = &heap_size,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&heap_cmd) );
-
+    ESP_ERROR_CHECK(esp_console_cmd_register(&heap_cmd));
 }
 
 /** 'tasks' command prints the list of tasks and related information */
@@ -219,7 +222,7 @@ static void register_tasks(void)
         .hint = NULL,
         .func = &tasks_info,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 #endif // WITH_TASKS_INFO
@@ -235,10 +238,9 @@ static struct {
     struct arg_end *end;
 } deep_sleep_args;
 
-
 static int deep_sleep(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &deep_sleep_args);
+    int nerrors = arg_parse(argc, argv, (void **)&deep_sleep_args);
     if (nerrors != 0) {
         arg_print_errors(stderr, deep_sleep_args.end, argv[0]);
         return 1;
@@ -246,7 +248,7 @@ static int deep_sleep(int argc, char **argv)
     if (deep_sleep_args.wakeup_time->count) {
         uint64_t timeout = 1000ULL * deep_sleep_args.wakeup_time->ival[0];
         ESP_LOGI(TAG, "Enabling timer wakeup, timeout=%lluus", timeout);
-        ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
+        ESP_ERROR_CHECK(esp_sleep_enable_timer_wakeup(timeout));
     }
 
 #if SOC_PM_SUPPORT_EXT_WAKEUP
@@ -264,17 +266,20 @@ static int deep_sleep(int argc, char **argv)
                 return 1;
             }
         }
-        ESP_LOGI(TAG, "Enabling wakeup on GPIO%d, wakeup on %s level",
-                 io_num, level ? "HIGH" : "LOW");
+        ESP_LOGI(TAG, "Enabling wakeup on GPIO%d, wakeup on %s level", io_num,
+                 level ? "HIGH" : "LOW");
 
-        ESP_ERROR_CHECK( esp_sleep_enable_ext1_wakeup(1ULL << io_num, (esp_sleep_ext1_wakeup_mode_t)level) );
-        ESP_LOGE(TAG, "GPIO wakeup from deep sleep currently unsupported on ESP32-C3");
+        ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(
+            1ULL << io_num, (esp_sleep_ext1_wakeup_mode_t)level));
+        ESP_LOGE(
+            TAG,
+            "GPIO wakeup from deep sleep currently unsupported on ESP32-C3");
     }
 #endif // SOC_PM_SUPPORT_EXT_WAKEUP
 
 #if CONFIG_IDF_TARGET_ESP32
     rtc_gpio_isolate(GPIO_NUM_12);
-#endif //CONFIG_IDF_TARGET_ESP32
+#endif // CONFIG_IDF_TARGET_ESP32
 
     esp_deep_sleep_start();
 }
@@ -285,9 +290,8 @@ static void register_deep_sleep(void)
     deep_sleep_args.wakeup_time =
         arg_int0("t", "time", "<t>", "Wake up time, ms");
 #if SOC_PM_SUPPORT_EXT_WAKEUP
-    deep_sleep_args.wakeup_gpio_num =
-        arg_int0(NULL, "io", "<n>",
-                 "If specified, wakeup using GPIO with given number");
+    deep_sleep_args.wakeup_gpio_num = arg_int0(
+        NULL, "io", "<n>", "If specified, wakeup using GPIO with given number");
     deep_sleep_args.wakeup_gpio_level =
         arg_int0(NULL, "io_level", "<0|1>", "GPIO level to trigger wakeup");
     num_args += 2;
@@ -298,16 +302,16 @@ static void register_deep_sleep(void)
         .command = "deep_sleep",
         .help = "Enter deep sleep mode. "
 #if SOC_PM_SUPPORT_EXT_WAKEUP
-        "Two wakeup modes are supported: timer and GPIO. "
+                "Two wakeup modes are supported: timer and GPIO. "
 #else
-        "Timer wakeup mode is supported. "
+                "Timer wakeup mode is supported. "
 #endif
-        "If no wakeup option is specified, will sleep indefinitely.",
+                "If no wakeup option is specified, will sleep indefinitely.",
         .hint = NULL,
         .func = &deep_sleep,
         .argtable = &deep_sleep_args
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 /** 'light_sleep' command puts the chip into light sleep mode */
@@ -321,7 +325,7 @@ static struct {
 
 static int light_sleep(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &light_sleep_args);
+    int nerrors = arg_parse(argc, argv, (void **)&light_sleep_args);
     if (nerrors != 0) {
         arg_print_errors(stderr, light_sleep_args.end, argv[0]);
         return 1;
@@ -330,11 +334,12 @@ static int light_sleep(int argc, char **argv)
     if (light_sleep_args.wakeup_time->count) {
         uint64_t timeout = 1000ULL * light_sleep_args.wakeup_time->ival[0];
         ESP_LOGI(TAG, "Enabling timer wakeup, timeout=%lluus", timeout);
-        ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
+        ESP_ERROR_CHECK(esp_sleep_enable_timer_wakeup(timeout));
     }
     int io_count = light_sleep_args.wakeup_gpio_num->count;
     if (io_count != light_sleep_args.wakeup_gpio_level->count) {
-        ESP_LOGE(TAG, "Should have same number of 'io' and 'io_level' arguments");
+        ESP_LOGE(TAG,
+                 "Should have same number of 'io' and 'io_level' arguments");
         return 1;
     }
     for (int i = 0; i < io_count; ++i) {
@@ -344,18 +349,23 @@ static int light_sleep(int argc, char **argv)
             ESP_LOGE(TAG, "Invalid wakeup level: %d", level);
             return 1;
         }
-        ESP_LOGI(TAG, "Enabling wakeup on GPIO%d, wakeup on %s level",
-                 io_num, level ? "HIGH" : "LOW");
+        ESP_LOGI(TAG, "Enabling wakeup on GPIO%d, wakeup on %s level", io_num,
+                 level ? "HIGH" : "LOW");
 
-        ESP_ERROR_CHECK( gpio_wakeup_enable((gpio_num_t)io_num, level ? GPIO_INTR_HIGH_LEVEL : GPIO_INTR_LOW_LEVEL) );
+        ESP_ERROR_CHECK(gpio_wakeup_enable((gpio_num_t)io_num,
+                                           level ? GPIO_INTR_HIGH_LEVEL
+                                                 : GPIO_INTR_LOW_LEVEL));
     }
     if (io_count > 0) {
-        ESP_ERROR_CHECK( esp_sleep_enable_gpio_wakeup() );
+        ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
     }
-    if (CONFIG_ESP_CONSOLE_UART_NUM >= 0 && CONFIG_ESP_CONSOLE_UART_NUM <= UART_NUM_1) {
+    if (CONFIG_ESP_CONSOLE_UART_NUM >= 0 &&
+        CONFIG_ESP_CONSOLE_UART_NUM <= UART_NUM_1) {
         ESP_LOGI(TAG, "Enabling UART wakeup (press ENTER to exit light sleep)");
-        ESP_ERROR_CHECK( uart_set_wakeup_threshold(CONFIG_ESP_CONSOLE_UART_NUM, 3) );
-        ESP_ERROR_CHECK( esp_sleep_enable_uart_wakeup(CONFIG_ESP_CONSOLE_UART_NUM) );
+        ESP_ERROR_CHECK(
+            uart_set_wakeup_threshold(CONFIG_ESP_CONSOLE_UART_NUM, 3));
+        ESP_ERROR_CHECK(
+            esp_sleep_enable_uart_wakeup(CONFIG_ESP_CONSOLE_UART_NUM));
     }
     fflush(stdout);
     fsync(fileno(stdout));
@@ -387,22 +397,21 @@ static void register_light_sleep(void)
     light_sleep_args.wakeup_gpio_num =
         arg_intn(NULL, "io", "<n>", 0, 8,
                  "If specified, wakeup using GPIO with given number");
-    light_sleep_args.wakeup_gpio_level =
-        arg_intn(NULL, "io_level", "<0|1>", 0, 8, "GPIO level to trigger wakeup");
+    light_sleep_args.wakeup_gpio_level = arg_intn(
+        NULL, "io_level", "<0|1>", 0, 8, "GPIO level to trigger wakeup");
     light_sleep_args.end = arg_end(3);
 
     const esp_console_cmd_t cmd = {
         .command = "light_sleep",
         .help = "Enter light sleep mode. "
-        "Two wakeup modes are supported: timer and GPIO. "
-        "Multiple GPIO pins can be specified using pairs of "
-        "'io' and 'io_level' arguments. "
-        "Will also wake up on UART input.",
+                "Two wakeup modes are supported: timer and GPIO. "
+                "Multiple GPIO pins can be specified using pairs of "
+                "'io' and 'io_level' arguments. "
+                "Will also wake up on UART input.",
         .hint = NULL,
         .func = &light_sleep,
-        .argtable = &light_sleep_args
-    };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+        .argtable = &light_sleep_args};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 /** log_level command changes log level via esp_log_level_set */
@@ -413,48 +422,48 @@ static struct {
     struct arg_end *end;
 } log_level_args;
 
-static const char* s_log_level_names[] = {
-    "none",
-    "error",
-    "warn",
-    "info",
-    "debug",
-    "verbose"
-};
+static const char *s_log_level_names[] = {"none", "error", "warn",
+                                          "info", "debug", "verbose"};
 
 static int log_level(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &log_level_args);
+    int nerrors = arg_parse(argc, argv, (void **)&log_level_args);
     if (nerrors != 0) {
         arg_print_errors(stderr, log_level_args.end, argv[0]);
         return 1;
     }
     assert(log_level_args.tag->count == 1);
     assert(log_level_args.level->count == 1);
-    const char* tag = log_level_args.tag->sval[0];
-    const char* level_str = log_level_args.level->sval[0];
+    const char *tag = log_level_args.tag->sval[0];
+    const char *level_str = log_level_args.level->sval[0];
     esp_log_level_t level;
     size_t level_len = strlen(level_str);
-    for (level = ESP_LOG_NONE; level <= ESP_LOG_VERBOSE; level = (esp_log_level_t)((int)level+1)) {
+    for (level = ESP_LOG_NONE; level <= ESP_LOG_VERBOSE;
+         level = (esp_log_level_t)((int)level + 1)) {
         if (memcmp(level_str, s_log_level_names[level], level_len) == 0) {
             break;
         }
     }
     if (level > ESP_LOG_VERBOSE) {
-        printf("Invalid log level '%s', choose from none|error|warn|info|debug|verbose\n", level_str);
+        printf("Invalid log level '%s', choose from "
+               "none|error|warn|info|debug|verbose\n",
+               level_str);
         return 1;
     }
     if (level > CONFIG_LOG_MAXIMUM_LEVEL) {
-        printf("Can't set log level to %s, max level limited in menuconfig to %s. "
-               "Please increase CONFIG_LOG_MAXIMUM_LEVEL in menuconfig.\n",
-               s_log_level_names[level], s_log_level_names[CONFIG_LOG_MAXIMUM_LEVEL]);
+        printf(
+            "Can't set log level to %s, max level limited in menuconfig to %s. "
+            "Please increase CONFIG_LOG_MAXIMUM_LEVEL in menuconfig.\n",
+            s_log_level_names[level],
+            s_log_level_names[CONFIG_LOG_MAXIMUM_LEVEL]);
         return 1;
     }
     esp_log_level_set(tag, level);
-    if(!strcmp(tag, "*") && level == ESP_LOG_NONE) {
+    if (!strcmp(tag, "*") && level == ESP_LOG_NONE) {
         Save::clear_log_levels();
-    } else if(level <= ESP_LOG_INFO) {
-        // do not allow saving debug or verbose persistently, this can cause reboot loops
+    } else if (level <= ESP_LOG_INFO) {
+        // do not allow saving debug or verbose persistently, this can cause
+        // reboot loops
         Save::save_log_level(tag, level);
     }
     return 0;
@@ -462,39 +471,119 @@ static int log_level(int argc, char **argv)
 
 static void register_log_level(void)
 {
-    log_level_args.tag = arg_str1(NULL, NULL, "<tag|*>", "Log tag to set the level for, or * to set for all tags");
-    log_level_args.level = arg_str1(NULL, NULL, "<none|error|warn|debug|verbose>", "Log level to set. Abbreviated words are accepted.");
+    log_level_args.tag =
+        arg_str1(NULL, NULL, "<tag|*>",
+                 "Log tag to set the level for, or * to set for all tags");
+    log_level_args.level =
+        arg_str1(NULL, NULL, "<none|error|warn|debug|verbose>",
+                 "Log level to set. Abbreviated words are accepted.");
     log_level_args.end = arg_end(2);
 
     const esp_console_cmd_t cmd = {
         .command = "log_level",
-        .help = "Set log level for all tags or a specific tag. "\
-            "Persistent across reboots. Use 'log_level * none' to reset all saved levels. " \
-            "Levels other than debug/verbose persist across restarts.",
+        .help = "Set log level for all tags or a specific tag. "
+                "Persistent across reboots. Use 'log_level * none' to reset "
+                "all saved levels. "
+                "Levels other than debug/verbose persist across restarts.",
         .hint = NULL,
         .func = &log_level,
-        .argtable = &log_level_args
-    };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+        .argtable = &log_level_args};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
+static struct {
+    struct arg_str *command;
+    struct arg_str *endpoint;
+    struct arg_end *end;
+} wifi_args;
 
-static int wifi_hit(int argc, char** argv) {
-  printf("Hello :)\n");
-
-  return 0;
+static void wifi_enable(void)
+{
+  esp_err_t err = Wifi::getInstance().enable();
+  if (ESP_OK != err) printf("Failed to enable wifi.\r\n");
+  else printf("Wifi enabled.\r\n");
 }
 
-static void register_debug_commands(void) {
+static void wifi_disable(void)
+{
+  esp_err_t err = Wifi::getInstance().disable();
+  if (ESP_OK != err) printf("Failed to disable wifi.\r\n");
+  else printf("Wifi disabled.\r\n");
+}
 
-  const esp_console_cmd_t cmd = {
-    .command = "wifi",
-    .help = "Hit the given address with an HTTP get",
-    .hint = NULL,
-    .func = &wifi_hit,
-    .argtable = NULL
+static void wifi_hit(const char* endpoint) {
+  int status_code = 0;
+  char response_buffer[1024 + 1] = {0};
+  esp_http_client_config_t cfg = {
+    .url = "http://192.168.5.12:8000",
+    .method = HTTP_METHOD_GET,
+    .user_data = response_buffer,
   };
 
-  ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+  esp_http_client_handle_t client_handle = esp_http_client_init(&cfg);
+  esp_err_t err = esp_http_client_perform(client_handle);
 
+  if (ESP_OK != err) {
+    printf("Failed to sent GET to %s.\r\n", cfg.url);
+    goto fail;
+  }
+
+  status_code = esp_http_client_get_status_code(client_handle);
+
+  if(200 != status_code) {
+    printf("Failed to perform query: status code %d\r\n", status_code);
+    goto fail;
+  }
+
+  printf("Response received:\r\n");
+  printf("%s", (char*) response_buffer);
+
+  fail:
+    esp_http_client_cleanup(client_handle);
+}
+
+static int wifi_cmd(int argc, char **argv)
+{
+    int nerrors = arg_parse(argc, argv, (void **)&wifi_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, wifi_args.end, argv[0]);
+        return 1;
+    }
+
+    assert(wifi_args.command->count == 1);
+    const char *command = wifi_args.command->sval[0];
+
+    if (0 == strcmp("enable", command)) {
+        wifi_enable();
+    } else if (0 == strcmp("disable", command)) {
+        wifi_disable();
+    } else if (0 == strcmp("hit", command)) {
+        assert(wifi_args.endpoint->count == 1);
+        const char *endpoint = wifi_args.endpoint->sval[0];
+        wifi_hit(endpoint);
+    } else {
+        return 1;
+    }
+
+    return 0;
+}
+
+static void register_debug_commands(void)
+{
+
+    wifi_args.command = arg_str1(NULL, NULL, "<enable|disable|hit>", "wifi command to execute");
+    wifi_args.endpoint = arg_str1(
+        NULL, NULL,
+        "|<url>",
+        "The http endpoint to hit. Must be provided for hit, empty otherwise.");
+    wifi_args.end = arg_end(2);
+
+    const esp_console_cmd_t cmd = {.command = "wifi",
+                                   .help =
+                                       "Hit the given address with an HTTP get",
+                                   .hint = NULL,
+                                   .func = &wifi_cmd,
+                                   .argtable = &wifi_args};
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
