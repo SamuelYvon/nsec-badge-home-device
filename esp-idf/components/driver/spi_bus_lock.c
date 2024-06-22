@@ -646,7 +646,7 @@ esp_err_t spi_bus_lock_register_dev(spi_bus_lock_handle_t lock, spi_bus_lock_dev
     dev_lock->parent = lock;
     dev_lock->mask = DEV_MASK(id);
 
-    ESP_LOGV(TAG, "device registered on bus %d slot %d.", lock->host_id, id);
+    // ESP_LOGV(TAG, "device registered on bus %d slot %d.", lock->host_id, id);
     atomic_store(&lock->dev[id], (intptr_t)dev_lock);
     *out_dev_handle = dev_lock;
     return ESP_OK;
@@ -698,8 +698,8 @@ IRAM_ATTR bool spi_bus_lock_touch(spi_bus_lock_dev_handle_t dev_handle)
     dev_handle->parent->last_dev = dev_handle;
     if (last_dev != dev_handle) {
         int last_dev_id = (last_dev? dev_lock_get_id(last_dev): -1);
-        ESP_DRAM_LOGV(TAG, "SPI dev changed from %d to %d",
-                    last_dev_id, dev_lock_get_id(dev_handle));
+        // ESP_DRAM_LOGV(TAG, "SPI dev changed from %d to %d",
+                    // last_dev_id, dev_lock_get_id(dev_handle));
     }
     return (dev_handle != last_dev);
 }
@@ -722,7 +722,7 @@ IRAM_ATTR esp_err_t spi_bus_lock_acquire_start(spi_bus_lock_dev_t *dev_handle, T
         if (err != ESP_OK) return err;
     }
 
-    ESP_DRAM_LOGV(TAG, "dev %d acquired.", dev_lock_get_id(dev_handle));
+    // ESP_DRAM_LOGV(TAG, "dev %d acquired.", dev_lock_get_id(dev_handle));
     BUS_LOCK_DEBUG_EXECUTE_CHECK(lock->acquiring_dev == dev_handle);
 
     //When arrives at here, requests of this device should already be handled
@@ -741,7 +741,7 @@ IRAM_ATTR esp_err_t spi_bus_lock_acquire_end(spi_bus_lock_dev_t *dev_handle)
 
     acquire_end_core(dev_handle);
 
-    ESP_LOGV(TAG, "dev %d released.", dev_lock_get_id(dev_handle));
+    // ESP_LOGV(TAG, "dev %d released.", dev_lock_get_id(dev_handle));
     return ESP_OK;
 }
 
@@ -796,7 +796,7 @@ IRAM_ATTR esp_err_t spi_bus_lock_wait_bg_done(spi_bus_lock_dev_handle_t dev_hand
 SPI_MASTER_ISR_ATTR bool spi_bus_lock_bg_clear_req(spi_bus_lock_dev_t *dev_handle)
 {
     bool finished = clear_pend_core(dev_handle);
-    ESP_EARLY_LOGV(TAG, "dev %d served from bg.", dev_lock_get_id(dev_handle));
+    // ESP_EARLY_LOGV(TAG, "dev %d served from bg.", dev_lock_get_id(dev_handle));
     return finished;
 }
 
